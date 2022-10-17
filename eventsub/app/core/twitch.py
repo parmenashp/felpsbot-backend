@@ -25,20 +25,21 @@ class TwitchAPI:
 
     async def authorize(self):
         logger.info("Authorizing Twitch API")
-        if not self._redis.ready:
-            logger.warning("Redis is not connected. Cannot get cached access token.")
-            await self.generate_token()
-
+        
         self._access_token: str | None = await self._redis.get("twitch:access_token")
         if self._access_token is None:
             logger.info("No cached access token found, generating new one")
             await self.generate_token()
+            logger.info("Twitch API authorized")
             return
 
         ttl = await self._redis.get_ttl("twitch:access_token")
         if ttl:
             # -5 seconds just to be safe
             self._access_token_expires = datetime.now() + timedelta(seconds=ttl - 5)
+            
+        logger.info("Twitch API authorized")
+        
 
     async def generate_token(self):
         logger.info("Generating new Twitch access token")
