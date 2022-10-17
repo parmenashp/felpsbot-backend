@@ -2,6 +2,7 @@ version: "3.9"
 services:
   eventsub:
     build: ./eventsub
+    command: ["uvicorn", "app.main:app", "--proxy-headers", "--root-path", "/ttvint", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
     ports:
       - "8050:8000"
@@ -30,7 +31,7 @@ services:
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       start_period: 30s
-      interval: 10s
+      interval: 5s
       timeout: 3s
       retries: 3
 
@@ -43,6 +44,6 @@ services:
     healthcheck:
       test: [ "CMD-SHELL", "redis-cli ping | grep PONG" ]
       start_period: 30s
-      interval: 10s
+      interval: 5s
       timeout: 3s
       retries: 3
