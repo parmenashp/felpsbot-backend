@@ -10,10 +10,14 @@ from app.core.redis import redis
 from app.core.twitch import twitch_api
 from app.routes import eventsub
 
-logger.remove()  # All configured handlers are removed
+logger.remove()  # All cdefault handlers are removed
 logger.add(sys.stderr, diagnose=False, level=os.getenv("LOG_LEVEL", "INFO"))
 
-app = FastAPI(title="TwitchIntegration", description="Twitch Integration", version="0.1.0")
+app = FastAPI(
+    title="TwitchIntegration",
+    description="FelpsBot service to comunicate with Twitch Eventsub",
+    version="0.1.0",
+)
 
 
 @app.middleware("http")
