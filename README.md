@@ -21,7 +21,7 @@ It uses [FastAPI](https://fastapi.tiangolo.com/) web framework, [PostgreSQL](htt
 1. Clone the repository 
 
 ```bash
-git clone https://github.com/mitsuaky/felpbot-backend
+git clone https://github.com/mitsuaky/felpsbot-backend
 ```
 
 2. Open the `./api/` and `./eventsub/`
