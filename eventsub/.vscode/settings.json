@@ -1,0 +1,4 @@
+{
+  "terminal.integrated.defaultProfile.windows": "Windows PowerShell",
+  "python.formatting.provider": "black"
+}
