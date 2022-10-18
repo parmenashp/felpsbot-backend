@@ -23,6 +23,6 @@ async def get_stream_game_time(fallback: str = "desconhecido", channel: Channel 
         return PlainTextResponse(fallback)
 
     time_playing_delta = datetime.now(timezone.utc) - last_time.last_played
-    text = humanize.precisedelta(time_playing_delta, minimum_unit="minutes")
+    text = humanize.naturaldelta(time_playing_delta)
 
     return PlainTextResponse(text)
