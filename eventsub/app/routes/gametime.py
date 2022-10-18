@@ -11,12 +11,15 @@ router = APIRouter()
 
 
 @router.get("/streamgametime/{streamer_id}")
-async def get_stream_game_time(channel: Channel = Depends(get_channel)):
+async def get_stream_game_time(fallback: str, channel: Channel = Depends(get_channel)):
+
+    if channel.game_id is None:
+        return PlainTextResponse(fallback)
 
     last_time = await LastTimePlayed.from_database(channel.broadcaster_id, channel.game_id)
 
     if last_time is None:
-        return PlainTextResponse("algum tempo")
+        return PlainTextResponse(fallback)
 
     time_playing_delta = datetime.now() - last_time.last_played
     text = humanize.precisedelta(time_playing_delta, minimum_unit="minutes")
