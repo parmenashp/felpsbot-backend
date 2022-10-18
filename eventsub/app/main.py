@@ -9,7 +9,7 @@ from loguru import logger
 from app.core.database import database
 from app.core.redis import redis
 from app.core.twitch import twitch_api
-from app.routes import eventsub
+from app.routes import eventsub, gametime
 
 humanize.i18n.activate("pt_BR")  # type: ignore   Set the locale for humanize to pt_BR
 
@@ -39,4 +39,5 @@ async def startup():
     await twitch_api.authorize()
 
 
+app.include_router(gametime.router)
 app.include_router(eventsub.router)
