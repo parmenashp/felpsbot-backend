@@ -13,7 +13,8 @@ router = APIRouter()
 @router.get("/streamgametime/{streamer_id}")
 async def get_stream_game_time(fallback: str = "desconhecido", channel: Channel = Depends(get_channel)):
 
-    if channel.game_id is None:
+    # If streamer offline, game_id = ""
+    if channel.game_id:
         return PlainTextResponse(fallback)
 
     last_time = await LastTimePlayed.from_database(channel.broadcaster_id, channel.game_id)
