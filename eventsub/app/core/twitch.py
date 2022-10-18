@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 import httpx
 from app.core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
 from app.core.redis import Redis, redis
+from app.core.schemas.twitch import Channel
 from loguru import logger
 
 
@@ -25,7 +26,7 @@ class TwitchAPI:
 
     async def authorize(self):
         logger.info("Authorizing Twitch API")
-        
+
         self._access_token: str | None = await self._redis.get("twitch:access_token")
         if self._access_token is None:
             logger.info("No cached access token found, generating new one")
@@ -37,9 +38,8 @@ class TwitchAPI:
         if ttl:
             # -5 seconds just to be safe
             self._access_token_expires = datetime.now() + timedelta(seconds=ttl - 5)
-            
+
         logger.info("Twitch API authorized")
-        
 
     async def generate_token(self):
         logger.info("Generating new Twitch access token")
@@ -162,6 +162,13 @@ class TwitchAPI:
 
         response.raise_for_status()
         return response
+
+    async def fetch_channels(self, broadcaster_ids: list[int]) -> list[Channel]:
+        """Gets channel information for users."""
+
+        logger.debug(f"Fetching {len(broadcaster_ids)} streams from API. {broadcaster_ids}")
+        response = await self.get("channels", params={"broadcaster_id": broadcaster_ids})
+        return [Channel(**x) for x in response.json()["data"]]
 
 
 twitch_api = TwitchAPI(os.environ["TWITCH_CLIENT_ID"], os.environ["TWITCH_CLIENT_SECRET"], redis)
