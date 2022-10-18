@@ -2,6 +2,7 @@ import os
 import sys
 import time
 
+import humanize
 from fastapi import FastAPI, Request
 from loguru import logger
 
@@ -9,6 +10,8 @@ from app.core.database import database
 from app.core.redis import redis
 from app.core.twitch import twitch_api
 from app.routes import eventsub
+
+humanize.i18n.activate("pt_BR")  # type: ignore   Set the locale for humanize to pt_BR
 
 logger.remove()  # All cdefault handlers are removed
 logger.add(sys.stderr, diagnose=False, level=os.getenv("LOG_LEVEL", "INFO"))
