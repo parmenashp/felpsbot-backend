@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import humanize
 from app.core.dependencies.twitch import get_channel
@@ -22,7 +22,7 @@ async def get_stream_game_time(fallback: str = "desconhecido", channel: Channel 
     if last_time is None:
         return PlainTextResponse(fallback)
 
-    time_playing_delta = datetime.now() - last_time.last_played
+    time_playing_delta = datetime.now(timezone.utc) - last_time.last_played
     text = humanize.precisedelta(time_playing_delta, minimum_unit="minutes")
 
     return PlainTextResponse(text)
