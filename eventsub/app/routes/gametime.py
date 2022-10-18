@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/streamgametime/{streamer_id}")
-async def get_stream_game_time(fallback: str, channel: Channel = Depends(get_channel)):
+async def get_stream_game_time(fallback: str = "desconhecido", channel: Channel = Depends(get_channel)):
 
     if channel.game_id is None:
         return PlainTextResponse(fallback)
