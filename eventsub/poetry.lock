@@ -215,6 +215,17 @@ http2 = ["h2 (>=3,<5)"]
 socks = ["socksio (>=1.0.0,<2.0.0)"]
 
 [[package]]
+name = "humanize"
+version = "4.4.0"
+description = "Python humanize utilities"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+tests = ["freezegun", "pytest", "pytest-cov"]
+
+[[package]]
 name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -490,7 +501,7 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "17924a1cf0516aa4277ad65a367f146350fd09a0fc4761f7cefb909ae0fc05c4"
+content-hash = "b4054802c4bc609fdd528676906b7e21c6cdd434781359d5865eee796624c6e1"
 
 [metadata.files]
 anyio = []
@@ -521,6 +532,7 @@ h11 = [
 httpcore = []
 httptools = []
 httpx = []
+humanize = []
 idna = []
 iso8601 = []
 loguru = [
