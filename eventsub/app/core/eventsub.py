@@ -78,11 +78,11 @@ class EventSub:
 
         # TODO: Publish to redis and update the database in a background task after the response is sent
 
-        # Publish the notification to the redis pubsub channel
-        await redis.publish(PUB_SUB_CHANNEL, notification.to_publish_dict())
         # Update the last time the game was played for the streamer
         if notification.subscription.type == "channel.update":
             await self._update_last_time_played(notification)
+        # Publish the notification to the redis pubsub channel
+        await redis.publish(PUB_SUB_CHANNEL, notification.to_publish_dict())
 
         return ACKNOWLEDGE_RESPONSE
 
@@ -101,6 +101,10 @@ class EventSub:
         return ACKNOWLEDGE_RESPONSE
 
     async def _update_last_time_played(self, notification: Notification):
+        if not notification.event.category_id:  # type: ignore
+            logger.info("Game is not set, skipping")
+            return
+
         logger.info(
             f"Updating last time played {notification.event.category_name} "  # type: ignore
             f"for streamer {notification.event.broadcaster_user_name}"
