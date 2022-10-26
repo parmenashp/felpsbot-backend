@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import httpx
 from app.core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
 from app.core.redis import Redis, redis
-from app.core.schemas.twitch import Channel
+from app.core.schemas.twitch import Channel, Game
 from loguru import logger
 
 

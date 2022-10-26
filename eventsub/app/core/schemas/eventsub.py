@@ -31,14 +31,6 @@ class SubscriptionCreate(BaseModel):
     broadcaster_user_id: str
 
 
-class Game(BaseModel):
-    """Model for a Twitch Game"""
-
-    id: str
-    name: str
-    box_art_url: str
-
-
 class Stream(BaseModel):
     """Model for a Twitch Stream"""
 

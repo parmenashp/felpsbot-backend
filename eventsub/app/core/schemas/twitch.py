@@ -25,3 +25,11 @@ class Channel(BaseModel):
     broadcaster_language: str
     title: str
     delay: int
+
+
+class Game(BaseModel):
+    """Model for a Twitch Game"""
+
+    id: str
+    name: str
+    box_art_url: str
