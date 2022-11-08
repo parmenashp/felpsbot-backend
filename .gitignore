@@ -1,6 +1,9 @@
 # Container volumes
 data/
 
+#felpsbot discord bot
+felpsbot/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

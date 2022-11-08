@@ -16,6 +16,23 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    profiles:
+      - eventsub
+  
+  felpsbot:
+    build: ./felpsbot
+    restart: unless-stopped
+    env_file: ./felpsbot/.env
+    environment:
+      - POSTGRES_URL=postgres://postgres:postgres@postgres:5432/postgres
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    profiles:
+      - discord
 
   postgres:
     image: postgres:15
