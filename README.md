@@ -26,7 +26,7 @@ git clone https://github.com/mitsuaky/felpsbot-backend
 
 2. Open the `./api/` and `./eventsub/`
 
-3. Rename the `.env.exemple` file to `.env` and fill with your credentials
+3. Rename the `.env.example` file to `.env` and fill with your credentials
 
 ## Usage
 
