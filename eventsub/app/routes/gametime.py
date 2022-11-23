@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
 import humanize
+from fastapi import APIRouter, Depends
+from fastapi.responses import PlainTextResponse
+
+from app.core.database import database
 from app.core.dependencies.twitch import get_channel
 from app.core.models.database import LastTimePlayed
 from app.core.schemas.twitch import Channel
-from fastapi import APIRouter, Depends
-from fastapi.responses import PlainTextResponse
 
 router = APIRouter()
 
@@ -17,7 +19,7 @@ async def get_stream_game_time(fallback: str = "desconhecido", channel: Channel 
     if not channel.game_id:
         return PlainTextResponse(fallback)
 
-    last_time = await LastTimePlayed.from_database(channel.broadcaster_id, channel.game_id)
+    last_time = await LastTimePlayed.from_database(database, channel.broadcaster_id, channel.game_id)
 
     if last_time is None:
         return PlainTextResponse(fallback)

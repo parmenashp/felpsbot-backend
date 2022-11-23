@@ -2,13 +2,15 @@ from collections import deque
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
+from fastapi import HTTPException, Request, status
+from fastapi.responses import PlainTextResponse
+from loguru import logger
+
+from app.core.database import database
 from app.core.models.database import LastTimePlayed
 from app.core.models.eventsub import Notification, Subscription, SubscriptionRequest
 from app.core.redis import Redis, redis
 from app.core.twitch import TWITCH_API_BASE_URL, TwitchAPI, twitch_api
-from fastapi import HTTPException, Request, status
-from fastapi.responses import PlainTextResponse
-from loguru import logger
 
 if TYPE_CHECKING:
     from app.core.twitch import TwitchAPI
@@ -111,7 +113,7 @@ class EventSub:
         )
         streamer_id: str = notification.event.broadcaster_user_id
         game_id: str = notification.event.category_id  # type: ignore
-        await LastTimePlayed.update(streamer_id=streamer_id, game_id=game_id)
+        await LastTimePlayed(database, streamer_id, game_id).commit()
 
     async def fetch_subscriptions(self):
         logger.info("Fetching eventsub subscriptions")
