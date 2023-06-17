@@ -4,7 +4,7 @@ from fastapi import HTTPException, Path
 from httpx import HTTPStatusError
 
 
-async def get_channel(streamer_id: int = Path("The ID of the streamer", ge=1, le=2147483647)) -> Channel:
+async def get_channel(streamer_id: int = Path(description="The ID of the streamer", ge=1, le=2147483647)) -> Channel:
     # the streamer_id has the max value of int32
     try:
         channel = await twitch_api.fetch_channels([streamer_id])

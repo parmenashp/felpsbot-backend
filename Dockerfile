@@ -1,6 +1,6 @@
 # Dockerfile to build a container image for the FastAPI app
 
-FROM python:3.10-slim as requirements-stage
+FROM python:3.11-slim as requirements-stage
 
 WORKDIR /tmp
 
@@ -10,7 +10,7 @@ COPY ./pyproject.toml ./poetry.lock* /tmp/
 
 RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /code
 
