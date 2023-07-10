@@ -3,10 +3,13 @@ from datetime import datetime, timedelta
 from urllib.parse import urljoin
 
 import httpx
-from app.core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
-from app.core.redis import Redis, redis
-from app.core.schemas.twitch import Channel, Game
+import asyncio
+from core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
+from core.redis import Redis, redis
+from core.schemas.twitch import Channel, Game
 from loguru import logger
+
+CACHE_CHANNEL_TTL = 60 * 5  # 5 minutes
 
 
 class TwitchAPI:
@@ -164,11 +167,36 @@ class TwitchAPI:
         return response
 
     async def fetch_channels(self, broadcaster_ids: list[int]) -> list[Channel]:
-        """Gets channel information for users."""
+        """Fetches channel information for a list of users."""
 
         logger.debug(f"Fetching {len(broadcaster_ids)} streams from API. {broadcaster_ids}")
         response = await self.get("channels", params={"broadcaster_id": broadcaster_ids})
         return [Channel(**x) for x in response.json()["data"]]
+
+    async def get_channel(self, broadcaster_id: int) -> Channel:
+        """Gets channel information for a user from cache or API if not cached."""
+
+        logger.debug(f"Getting channel {broadcaster_id}")
+        channel = await self._redis.get_json(f"twitch:channel:{broadcaster_id}")
+        if channel:
+            logger.debug(f"Channel {broadcaster_id} found in cache")
+            return Channel(**channel)
+
+        logger.debug(f"Channel {broadcaster_id} not found in cache. Fetching from API")
+        channel = await self.fetch_channels([broadcaster_id])
+        if not channel:
+            logger.debug(f"Channel {broadcaster_id} not found in API")
+            return []
+
+        asyncio.create_task(
+            self._redis.set_json(
+                f"twitch:channel:{broadcaster_id}",
+                channel[0].dict(),
+                ttl=CACHE_CHANNEL_TTL,
+            )
+        )
+
+        return channel[0]
 
 
 twitch_api = TwitchAPI(os.environ["TWITCH_CLIENT_ID"], os.environ["TWITCH_CLIENT_SECRET"], redis)

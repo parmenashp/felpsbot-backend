@@ -19,7 +19,7 @@ class Redis:
 
     async def connect(self) -> bool:
         """Connects with Redis, raises `RedisConnectionError`if not able to connect."""
-        logger.info(f"Connecting to Redis at {self._url}")
+        logger.info(f"Connecting to Redis")
         try:
             if await self._redis.ping():
                 logger.info("Connected to Redis")
@@ -29,6 +29,11 @@ class Redis:
 
         except aioredis.ConnectionError:
             raise RedisConnectionError("Could not connect to Redis")
+
+    async def disconnect(self) -> None:
+        """Disconnects from Redis."""
+        logger.info("Disconnecting from Redis")
+        await self._redis.close()
 
     async def get(self, key) -> Optional[str]:
         """Get the value at `key`."""
@@ -119,4 +124,4 @@ class Redis:
             return [orjson.loads(v) if v is not None else None for v in redis_list], missing_keys
 
 
-redis = Redis(os.getenv("REDIS_URL", "redis://localhost:6379"))
+redis = Redis(os.getenv("REDIS_URL"))

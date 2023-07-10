@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Request, Response, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from app.core.dependencies.signature import verify_twitch_signature
-from app.core.dependencies.auth import UserHasScope
-from app.core import schemas
+from core.dependencies.signature import verify_twitch_signature
+from core.dependencies.auth import UserHasScope
+from core import schemas
 from httpx import HTTPStatusError
 
-from app.core.eventsub import eventsub
-from app.core.models.eventsub import SubscriptionRequest
+from core.eventsub import eventsub
+from core.models.eventsub import SubscriptionRequest
 from loguru import logger
 
 router = APIRouter(prefix="/eventsub", tags=["Twitch EventSub"])
+
 
 # be sure to change the callback url in the core.constants file if you change the path here
 @router.post("/callback", dependencies=[Depends(verify_twitch_signature)])

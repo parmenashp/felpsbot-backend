@@ -1,7 +1,7 @@
 import os
 
 import iso8601
-from app.core.constants import CALLBACK_URL
+from core.constants import CALLBACK_URL
 from fastapi import HTTPException
 
 

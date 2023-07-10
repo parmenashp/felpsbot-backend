@@ -4,22 +4,24 @@ import humanize
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
-from app.core.database import database
-from app.core.dependencies.twitch import get_channel
-from app.core.models.database import LastTimePlayed
-from app.core.schemas.twitch import Channel
+from core.prisma import prisma
+from core.dependencies.twitch import get_channel
+from core.schemas.twitch import Channel
 
 router = APIRouter()
 
 
 @router.get("/streamgametime/{streamer_id}")
-async def get_stream_game_time(fallback: str = "desconhecido", channel: Channel = Depends(get_channel)):
-
+async def get_stream_game_time(
+    fallback: str = "desconhecido", channel: Channel = Depends(get_channel)
+) -> PlainTextResponse:
     # If streamer offline, game_id = ""
     if not channel.game_id:
         return PlainTextResponse(fallback)
 
-    last_time = await LastTimePlayed.from_database(database, channel.broadcaster_id, channel.game_id)
+    last_time = await prisma.lasttimeplayed.find_unique(
+        where={"game_streamer_unique": {"game_id": channel.game_id, "streamer_id": channel.id}}
+    )
 
     if last_time is None:
         return PlainTextResponse(fallback)

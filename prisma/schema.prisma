@@ -1,0 +1,35 @@
+datasource db {
+    provider = "postgresql"
+    url      = env("POSTGRES_URL")
+}
+
+generator client {
+    provider             = "prisma-client-py"
+    recursive_type_depth = -1
+}
+
+model LastTimePlayed {
+    game_id     BigInt
+    streamer_id BigInt
+    last_time   DateTime @default(now())
+
+    game     Game     @relation(fields: [game_id], references: [twitch_id])
+    streamer Streamer @relation(fields: [streamer_id], references: [twitch_id])
+
+    @@id([game_id, streamer_id], name: "game_streamer_unique")
+}
+
+model Game {
+    twitch_id BigInt @id
+    name      String
+    image_url String
+
+    last_time_played LastTimePlayed[]
+}
+
+model Streamer {
+    twitch_id BigInt @id
+    name      String
+
+    last_time_played LastTimePlayed[]
+}

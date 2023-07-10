@@ -1,33 +1,43 @@
 from collections import deque
+from datetime import datetime
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, Request, status
 from fastapi.responses import PlainTextResponse
 from loguru import logger
+from core.constants import RABBIMQ_EXCHANGE, RABBIMQ_URL
 
-from app.core.database import database
-from app.core.models.database import LastTimePlayed
-from app.core.models.eventsub import Notification, Subscription, SubscriptionRequest
-from app.core.redis import Redis, redis
-from app.core.twitch import TWITCH_API_BASE_URL, TwitchAPI, twitch_api
+from core.prisma import prisma
+from core.models.eventsub import Notification, Subscription, SubscriptionRequest
+from core.twitch import TWITCH_API_BASE_URL, TwitchAPI, twitch_api
+import aio_pika
+import os
+import orjson
 
 if TYPE_CHECKING:
-    from app.core.twitch import TwitchAPI
+    from core.twitch import TwitchAPI
 
-MAX_LEN_DEQUE = 10
-
-PUB_SUB_CHANNEL = "twitch:eventsub"
+MAX_LEN_DEQUE = 15
 
 ACKNOWLEDGE_RESPONSE = PlainTextResponse("Acknowledged", status_code=status.HTTP_200_OK)
 
 
 class EventSub:
-    def __init__(self, twitch_api: TwitchAPI, redis: Redis) -> None:
+    def __init__(self, twitch_api: TwitchAPI) -> None:
         self.twitch_api = twitch_api
-        self.redis = redis
         self._processed = deque(maxlen=MAX_LEN_DEQUE)
         self.subscriptions = []
+        self.rabbit_channel: aio_pika.channel.AbstractChannel | None = None
+        self.rabbit_exchange: aio_pika.exchange.AbstractExchange | None = None
+
+    async def connect_to_rabbitmq(self):
+        logger.info("Connecting to rabbitmq")
+        connection = await aio_pika.connect_robust(RABBIMQ_URL)
+        self.rabbit_channel = await connection.channel()
+        self.rabbit_exchange = await self.rabbit_channel.declare_exchange(
+            RABBIMQ_EXCHANGE, aio_pika.ExchangeType.FANOUT, durable=True
+        )
 
     async def callback_handler(self, request: Request):
         try:
@@ -73,18 +83,22 @@ class EventSub:
         # self._processed keeps track of the last X notifications ID, as Twitch
         # can send more than one notification for the same event
         if request.headers.get("Twitch-Eventsub-Message-Id") in self._processed:
-            logger.debug(f"Notification already processed. Skipping")
+            logger.info(f"Notification already processed. Skipping")
             return ACKNOWLEDGE_RESPONSE
 
         self._processed.append(request.headers.get("Twitch-Eventsub-Message-Id"))
 
-        # TODO: Publish to redis and update the database in a background task after the response is sent
+        # TODO: Publish to rabbit and update the database in a background task after the response is sent
 
-        # Update the last time the game was played for the streamer
         if notification.subscription.type == "channel.update":
             await self._update_last_time_played(notification)
-        # Publish the notification to the redis pubsub channel
-        await redis.publish(PUB_SUB_CHANNEL, notification.to_publish_dict())
+
+        logger.info(f"Publishing notification to rabbitmq")
+        body = orjson.dumps(notification.to_publish_dict())
+        await self.rabbit_exchange.publish(
+            aio_pika.Message(body=body),
+            routing_key="",  # RabbitMQ ignores the routing key for fanout exchanges, but it is required
+        )
 
         return ACKNOWLEDGE_RESPONSE
 
@@ -104,7 +118,7 @@ class EventSub:
 
     async def _update_last_time_played(self, notification: Notification):
         if not notification.event.category_id:  # type: ignore
-            logger.info("Game is not set, skipping")
+            logger.info("Game is not set, skipping last time played update")
             return
 
         logger.info(
@@ -113,14 +127,36 @@ class EventSub:
         )
         streamer_id: str = notification.event.broadcaster_user_id
         game_id: str = notification.event.category_id  # type: ignore
-        await LastTimePlayed(database, streamer_id, game_id).commit()
+
+        await self.upsert_game(game_id, notification.event.category_name)
+        await self.upsert_last_time_played(streamer_id, game_id)
+
+    async def upsert_game(self, game_id: str, game_name: str):
+        logger.info(f"Upserting game {game_name} ({game_id})")
+        await prisma.game.upsert(
+            where={"twitch_id": game_id},
+            data={
+                "create": {"twitch_id": game_id, "name": game_name, "image_url": ""},
+                "update": {"name": game_name},
+            },
+        )
+
+    async def upsert_last_time_played(self, streamer_id: str, game_id: str):
+        logger.info(f"Upserting last time played for streamer {streamer_id} and game {game_id}")
+        await prisma.lasttimeplayed.upsert(
+            where={"game_streamer_unique": {"game_id": game_id, "streamer_id": streamer_id}},
+            data={
+                "create": {"game_id": game_id, "streamer_id": streamer_id},
+                "update": {"last_time": datetime.utcnow()},
+            },
+        )
 
     async def fetch_subscriptions(self):
         logger.info("Fetching eventsub subscriptions")
 
         response = await self.twitch_api.get(TWITCH_API_BASE_URL + "eventsub/subscriptions")
         self.subscriptions = [Subscription(data=sub) for sub in response.json()["data"]]
-        logger.debug(f"Fetched {len(self.subscriptions)} subscriptions")
+        logger.info(f"Fetched {len(self.subscriptions)} subscriptions")
 
     async def subscribe(self, sub_request: SubscriptionRequest, check_if_exists: bool = True) -> bool | dict:
         """Subscribe to a Twitch eventsub event. If check_if_exists is True, it will check if
@@ -169,4 +205,4 @@ class EventSub:
         return False
 
 
-eventsub = EventSub(twitch_api, redis)
+eventsub = EventSub(twitch_api)

@@ -27,4 +27,6 @@ RUN prisma generate
 
 COPY ./src .
 
-CMD ["uvicorn", "src.main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["doppler", "run", "--"]
+
+CMD ["uvicorn", "main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8000"]

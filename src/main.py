@@ -3,13 +3,18 @@ import sys
 import time
 
 import humanize
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from loguru import logger
 
-from app.core.database import database
-from app.core.redis import redis
-from app.core.twitch import twitch_api
-from app.routes import eventsub, gametime
+from core.prisma import prisma
+from core.redis import redis
+from core.twitch import twitch_api
+from core.eventsub import eventsub
+import routes.eventsub
+import routes.gametime
+
+from core.dependencies.auth import UserHasScope, get_current_auth0_user
+from core.schemas.auth0 import User
 
 humanize.i18n.activate("pt_BR")  # type: ignore   Set the locale for humanize to pt_BR
 
@@ -35,9 +40,21 @@ async def add_process_time_header(request: Request, call_next):
 @app.on_event("startup")
 async def startup():
     await redis.connect()
-    await database.connect()
+    await prisma.connect()
     await twitch_api.authorize()
+    await eventsub.connect_to_rabbitmq()
 
 
-app.include_router(gametime.router)
-app.include_router(eventsub.router)
+@app.on_event("shutdown")
+async def shutdown():
+    await redis.disconnect()
+    await prisma.disconnect()
+
+
+@app.get("/me", dependencies=[Depends(UserHasScope("profile"))])
+async def get_me(me: User = Depends(get_current_auth0_user)) -> User:
+    return me
+
+
+app.include_router(routes.gametime.router)
+app.include_router(routes.eventsub.router)
