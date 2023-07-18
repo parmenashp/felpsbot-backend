@@ -1,6 +1,6 @@
 import os
 
-CALLBACK_URL = os.environ["BACKEND_BASE_URL"] + "/eventsub/callback"
+CALLBACK_URL = os.environ["BACKEND_BASE_URL"].rstrip("/") + "/eventsub/callback"
 TWITCH_API_BASE_URL = "https://api.twitch.tv/helix/"
 TWITCH_OAUTH_URL = "https://id.twitch.tv/oauth2/token"
 
