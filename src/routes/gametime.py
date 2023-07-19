@@ -20,13 +20,13 @@ async def get_stream_game_time(
         return PlainTextResponse(fallback)
 
     last_time = await prisma.lasttimeplayed.find_unique(
-        where={"game_streamer_unique": {"game_id": channel.game_id, "streamer_id": channel.id}}
+        where={"game_streamer_unique": {"game_id": channel.game_id, "streamer_id": channel.broadcaster_id}}
     )
 
     if last_time is None:
         return PlainTextResponse(fallback)
 
-    time_playing_delta = datetime.now(timezone.utc) - last_time.last_played
+    time_playing_delta = datetime.now(timezone.utc) - last_time.last_time
     text = humanize.precisedelta(time_playing_delta, minimum_unit="seconds", format="%0.0f")
 
     return PlainTextResponse(text)
