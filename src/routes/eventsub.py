@@ -13,8 +13,15 @@ router = APIRouter(prefix="/eventsub", tags=["Twitch EventSub"])
 
 
 # be sure to change the callback url in the core.constants file if you change the path here
-@router.post("/callback", dependencies=[Depends(verify_twitch_signature)])
+@router.post(
+    path="/callback",
+    dependencies=[Depends(verify_twitch_signature)],
+    summary="Callback endpoint for Twitch EventSub.",
+)
 async def eventsub_callback(request: Request):
+    """
+    This endpoint is called by Twitch when an event happens.
+    """
     try:
         return await eventsub.callback_handler(request)
     except Exception as e:
@@ -30,9 +37,10 @@ async def eventsub_callback(request: Request):
 
 
 @router.get(
-    "/",
+    path="/",
     response_model=list[schemas.eventsub.Subscription],
     dependencies=[Depends(UserHasScope("eventsub:list"))],
+    summary="Returns a list of all Twitch EventSub subscriptions.",
 )
 async def list_subscriptions():
     await eventsub.fetch_subscriptions()
@@ -40,11 +48,15 @@ async def list_subscriptions():
 
 
 @router.post(
-    "/",
+    path="/",
     responses={202: {"description": "Subscription created"}, 409: {"description": "Subscription already exists"}},
     dependencies=[Depends(UserHasScope("eventsub:create"))],
+    summary="Creates a new Twitch EventSub subscription.",
 )
 async def create_subscription(subscription: schemas.SubscriptionCreate):
+    """
+    The subscription type must be one of: `channel.update`, `stream.online`, `stream.offline`
+    """
     match subscription.type:
         case "channel.update":
             request = SubscriptionRequest.channel_update(broadcaster_user_id=subscription.broadcaster_user_id)
@@ -68,9 +80,10 @@ async def create_subscription(subscription: schemas.SubscriptionCreate):
 
 
 @router.delete(
-    "/",
+    path="/",
     responses={204: {"description": "Subscription deleted"}, 404: {"description": "Subscription not found"}},
     dependencies=[Depends(UserHasScope("eventsub:delete"))],
+    summary="Deletes a Twitch EventSub subscription.",
 )
 async def delete_subscription(id: str):
     await eventsub.fetch_subscriptions()

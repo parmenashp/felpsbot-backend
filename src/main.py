@@ -22,8 +22,8 @@ logger.remove()  # All cdefault handlers are removed
 logger.add(sys.stderr, diagnose=False, level=os.getenv("LOG_LEVEL", "INFO"))
 
 app = FastAPI(
-    title="TwitchIntegration",
-    description="FelpsBot service to comunicate with Twitch Eventsub",
+    title="Felpsbot Backend API",
+    description="API for the Felpsbot.",
     version="0.1.0",
 )
 
