@@ -15,8 +15,11 @@ import aio_pika
 import os
 import orjson
 
+from aio_pika.abc import AbstractChannel
+
 if TYPE_CHECKING:
     from core.twitch import TwitchAPI
+from aio_pika.abc import AbstractChannel, AbstractExchange
 
 MAX_LEN_DEQUE = 15
 
@@ -28,8 +31,8 @@ class EventSub:
         self.twitch_api = twitch_api
         self._processed = deque(maxlen=MAX_LEN_DEQUE)
         self.subscriptions = []
-        self.rabbit_channel: aio_pika.channel.AbstractChannel | None = None
-        self.rabbit_exchange: aio_pika.exchange.AbstractExchange | None = None
+        self.rabbit_channel: AbstractChannel
+        self.rabbit_exchange: AbstractExchange
 
     async def connect_to_rabbitmq(self):
         logger.info("Connecting to rabbitmq")
@@ -128,25 +131,25 @@ class EventSub:
         streamer_id: str = notification.event.broadcaster_user_id
         game_id: str = notification.event.category_id  # type: ignore
 
-        await self.upsert_game(game_id, notification.event.category_name)
+        await self.upsert_game(game_id, notification.event.category_name)  # type: ignore
         await self.upsert_last_time_played(streamer_id, game_id)
 
-    async def upsert_game(self, game_id: str, game_name: str):
+    async def upsert_game(self, game_id: str | int, game_name: str):
         logger.info(f"Upserting game {game_name} ({game_id})")
         await prisma.game.upsert(
-            where={"twitch_id": game_id},
+            where={"twitch_id": int(game_id)},
             data={
-                "create": {"twitch_id": game_id, "name": game_name, "image_url": ""},
+                "create": {"twitch_id": int(game_id), "name": game_name, "image_url": ""},
                 "update": {"name": game_name},
             },
         )
 
-    async def upsert_last_time_played(self, streamer_id: str, game_id: str):
+    async def upsert_last_time_played(self, streamer_id: str | int, game_id: str | int):
         logger.info(f"Upserting last time played for streamer {streamer_id} and game {game_id}")
         await prisma.lasttimeplayed.upsert(
-            where={"game_streamer_unique": {"game_id": game_id, "streamer_id": streamer_id}},
+            where={"game_streamer_unique": {"game_id": int(game_id), "streamer_id": int(streamer_id)}},
             data={
-                "create": {"game_id": game_id, "streamer_id": streamer_id},
+                "create": {"game_id": int(game_id), "streamer_id": int(streamer_id)},
                 "update": {"last_time": datetime.utcnow()},
             },
         )

@@ -28,7 +28,11 @@ async def _verify_signature(request: Request) -> bool:
 
 
 async def verify_twitch_signature(request: Request):
-    """Dependency to verify the signature of a Twitch EventSub callback request."""
+    """Verify the signature of a Twitch EventSub callback request.
+
+    This function is a dependency that can be used with FastAPI to verify the signature of a Twitch EventSub callback request.
+    It raises an HTTPException with status code 401 if the signature is invalid, or with status code 400 if the signature is missing.
+    """
     try:
         if not await _verify_signature(request):
             logger.warning("Invalid Twitch EventSub signature")

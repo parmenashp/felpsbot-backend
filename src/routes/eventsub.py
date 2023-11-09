@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Request, Response, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Security
 from fastapi.responses import JSONResponse
-from core.dependencies.signature import verify_twitch_signature
-from core.dependencies.auth import UserHasScope
-from core import schemas
 from httpx import HTTPStatusError
+from loguru import logger
 
+from core import schemas
+from core.dependencies.signature import verify_twitch_signature
+from core.dependencies.auth import authenticate_user
 from core.eventsub import eventsub
 from core.models.eventsub import SubscriptionRequest
-from loguru import logger
 
 router = APIRouter(prefix="/eventsub", tags=["Twitch EventSub"])
 
@@ -39,7 +39,7 @@ async def eventsub_callback(request: Request):
 @router.get(
     path="/",
     response_model=list[schemas.eventsub.Subscription],
-    dependencies=[Depends(UserHasScope("eventsub:list"))],
+    dependencies=[Security(authenticate_user, scopes=["eventsub:list"])],
     summary="Returns a list of all Twitch EventSub subscriptions.",
 )
 async def list_subscriptions():
@@ -49,8 +49,11 @@ async def list_subscriptions():
 
 @router.post(
     path="/",
-    responses={202: {"description": "Subscription created"}, 409: {"description": "Subscription already exists"}},
-    dependencies=[Depends(UserHasScope("eventsub:create"))],
+    responses={
+        202: {"description": "Subscription created"},
+        409: {"description": "Subscription already exists"},
+    },
+    dependencies=[Security(authenticate_user, scopes=["eventsub:create"])],
     summary="Creates a new Twitch EventSub subscription.",
 )
 async def create_subscription(subscription: schemas.SubscriptionCreate):
@@ -82,7 +85,7 @@ async def create_subscription(subscription: schemas.SubscriptionCreate):
 @router.delete(
     path="/",
     responses={204: {"description": "Subscription deleted"}, 404: {"description": "Subscription not found"}},
-    dependencies=[Depends(UserHasScope("eventsub:delete"))],
+    dependencies=[Security(authenticate_user, scopes=["eventsub:delete"])],
     summary="Deletes a Twitch EventSub subscription.",
 )
 async def delete_subscription(id: str):

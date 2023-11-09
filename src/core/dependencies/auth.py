@@ -1,23 +1,28 @@
 import json
-from urllib.request import urlopen
 import urllib.parse
+from typing import Annotated, Optional
 
 import httpx
-from core.constants import AUTH0_AUDIENCE, AUTH0_ISSUER
-from core.schemas import auth0
 from authlib.jose import JWTClaims, jwt
 from authlib.jose.errors import ExpiredTokenError, JoseError
 from authlib.jose.rfc7517.jwk import JsonWebKey
 from authlib.oauth2.rfc7523 import JWTBearerTokenValidator
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2
+from fastapi import Depends, HTTPException, Request
+from fastapi.openapi.models import OAuthFlowImplicit, OAuthFlows
+from fastapi.security import OAuth2, SecurityScopes
 from loguru import logger
-from fastapi.openapi.models import OAuthFlows, OAuthFlowImplicit
-from starlette.status import HTTP_403_FORBIDDEN, HTTP_429_TOO_MANY_REQUESTS
+from starlette.status import (
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+    HTTP_429_TOO_MANY_REQUESTS,
+    HTTP_503_SERVICE_UNAVAILABLE,
+)
+
+from core.constants import AUTH0_AUDIENCE, AUTH0_ISSUER
+from core.schemas import auth0
 
 
-class OAuth2ImplicitBearer(OAuth2):
-    # This is only for the OpenAPI documentation page
+class DiscordOAuth2ImplicitBearer(OAuth2):
     def __init__(self):
         url_encoded_audience = urllib.parse.urlencode({"audience": AUTH0_AUDIENCE})
         authorization_url = f"{AUTH0_ISSUER}authorize?{url_encoded_audience}&connection=discord"
@@ -35,17 +40,23 @@ class OAuth2ImplicitBearer(OAuth2):
                 )
             ),
             scheme_name="Auth0 Discord",
-            description="Connect with Discord to authenticate using Auth0 - Client ID: ZCOSW8pQ1S0sENT2k5MRNny9ZAoKGRzk",
+            description="Connect with Discord to authenticate using Auth0",
+            auto_error=True,
         )
 
-    # async def __call__(self, request):
-    #     # Overwrite parent call to prevent useless overhead,
-    #     # the actual auth is done by the HTTPBearer() dependency
-    #     return None
-
-
-token_auth_scheme = HTTPBearer()
-implicit_auth_scheme = OAuth2ImplicitBearer()
+    async def __call__(self, request: Request) -> Optional[str]:
+        authorization = request.headers.get("Authorization")
+        if authorization:
+            scheme, _, param = authorization.partition(" ")
+            if scheme.lower() == "bearer":
+                return param
+        if self.auto_error:
+            raise HTTPException(
+                status_code=HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return None
 
 
 class Auth0JWTBearerTokenValidator(JWTBearerTokenValidator):
@@ -61,6 +72,11 @@ class Auth0JWTBearerTokenValidator(JWTBearerTokenValidator):
 
     async def authenticate_token(self, token_string) -> JWTClaims:
         logger.debug("Validating auth token")
+        credentials_exception = HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
         try:
             claims = jwt.decode(
                 token_string,
@@ -72,13 +88,10 @@ class Auth0JWTBearerTokenValidator(JWTBearerTokenValidator):
             return claims
         except ExpiredTokenError:
             logger.info("Access token expired")
-            raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Access token expired")
+            raise credentials_exception
         except JoseError:
             logger.info(f"Unable to validate token, refusing access")
-            raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Invalid token")
-
-
-token_validator = Auth0JWTBearerTokenValidator(audience=AUTH0_AUDIENCE, issuer=AUTH0_ISSUER)
+            raise credentials_exception
 
 
 class AuthenticatedJWTToken:
@@ -94,41 +107,43 @@ class AuthenticatedJWTToken:
             raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Account not linked with Discord")
 
 
+implicit_auth_scheme = DiscordOAuth2ImplicitBearer()
+token_validator = Auth0JWTBearerTokenValidator(audience=AUTH0_AUDIENCE, issuer=AUTH0_ISSUER)
+
+
 async def authenticate_user(
-    _=Depends(implicit_auth_scheme),
-    token: HTTPAuthorizationCredentials = Depends(token_auth_scheme),
+    security_scopes: SecurityScopes, token: Annotated[str, Depends(implicit_auth_scheme)]
 ) -> AuthenticatedJWTToken:
-    """Dependency to authenticate the user using the auth0 access token"""
+    """Authenticates the user using the auth0 access token and validates the scopes."""
+    if security_scopes.scopes:
+        authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
+    else:
+        authenticate_value = "Bearer"
 
-    claims = await token_validator.authenticate_token(token.credentials)
-    return AuthenticatedJWTToken(claims, token.credentials)
+    claims = await token_validator.authenticate_token(token)
+    token_scopes = claims.get("scope", "").split()
+    logger.info(f"token_scopes: {token_scopes}, security_scopes: {security_scopes.scopes}")
+    for scope in security_scopes.scopes:
+        if scope not in token_scopes:
+            raise HTTPException(
+                status_code=HTTP_403_FORBIDDEN,
+                detail="Not enough permissions",
+                headers={"WWW-Authenticate": authenticate_value},
+            )
+    return AuthenticatedJWTToken(claims, token)
 
 
-async def get_current_user_id(token: AuthenticatedJWTToken = Depends(authenticate_user)) -> int:
+async def get_current_user_id(token: Annotated[AuthenticatedJWTToken, Depends(authenticate_user)]) -> int:
     """Dependency to get the current user discord id from the auth0 access token"""
 
     return token.discord_id
 
 
-class UserHasScope:
-    """Dependency to check if the current user has the required scope"""
+async def get_current_auth0_user(token: Annotated[AuthenticatedJWTToken, Depends(authenticate_user)]) -> auth0.User:
+    """Dependency to get the current user info from the Auth0 token."""
 
-    def __init__(self, required_scope: str) -> None:
-        self.required_scope = required_scope
-
-    def __call__(self, token: AuthenticatedJWTToken = Depends(authenticate_user)) -> None:
-        scopes = token.claims.get("scope", "").split()
-        if self.required_scope not in scopes:
-            raise HTTPException(
-                status_code=HTTP_403_FORBIDDEN, detail=f"You don't have the required scope: {self.required_scope}"
-            )
-
-
-async def get_current_auth0_user(token: AuthenticatedJWTToken = Depends(authenticate_user)) -> auth0.User:
-    """Dependency to get the current user info from the Auth0 token"""
     async with httpx.AsyncClient() as client:
         r = await client.get(
-            # https://felpsbot.us.auth0.com/userinfo
             url=f"{AUTH0_ISSUER}userinfo",
             headers={"Authorization": f"Bearer {token.token}", "Content-Type": "application/json"},
         )
@@ -136,5 +151,11 @@ async def get_current_auth0_user(token: AuthenticatedJWTToken = Depends(authenti
         r.raise_for_status()
     except httpx.HTTPStatusError as e:
         logger.debug(f"Failed to get user info from Auth0: {e}")
-        raise HTTPException(status_code=HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
+        if e.response.status_code == HTTP_429_TOO_MANY_REQUESTS:
+            raise HTTPException(status_code=HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
+        raise HTTPException(status_code=HTTP_503_SERVICE_UNAVAILABLE, detail="Auth0 is unavailable")
+    except httpx.HTTPError as e:
+        logger.debug(f"Failed to get user info from Auth0: {e}")
+        raise HTTPException(status_code=HTTP_503_SERVICE_UNAVAILABLE, detail="Auth0 is unavailable")
+
     return auth0.User(discord_id=str(token.discord_id), **r.json())

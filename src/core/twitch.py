@@ -6,7 +6,7 @@ import httpx
 import asyncio
 from core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
 from core.redis import Redis, redis
-from core.schemas.twitch import Channel, Game
+from core.schemas.twitch import Channel
 from loguru import logger
 
 CACHE_CHANNEL_TTL = 60 * 5  # 5 minutes
@@ -173,7 +173,7 @@ class TwitchAPI:
         response = await self.get("channels", params={"broadcaster_id": broadcaster_ids})
         return [Channel(**x) for x in response.json()["data"]]
 
-    async def get_channel(self, broadcaster_id: int) -> Channel:
+    async def get_channel(self, broadcaster_id: int) -> Channel | None:
         """Gets channel information for a user from cache or API if not cached."""
 
         logger.debug(f"Getting channel {broadcaster_id}")
@@ -186,7 +186,7 @@ class TwitchAPI:
         channel = await self.fetch_channels([broadcaster_id])
         if not channel:
             logger.debug(f"Channel {broadcaster_id} not found in API")
-            return []
+            return None
 
         asyncio.create_task(
             self._redis.set_json(

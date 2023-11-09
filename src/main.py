@@ -1,9 +1,10 @@
 import os
 import sys
 import time
+from typing import Annotated
 
 import humanize
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Security
 from loguru import logger
 
 from core.prisma import prisma
@@ -13,8 +14,8 @@ from core.eventsub import eventsub
 import routes.eventsub
 import routes.gametime
 
-from core.dependencies.auth import UserHasScope, get_current_auth0_user
-from core.schemas.auth0 import User
+from core.dependencies.auth import get_current_auth0_user
+from core.schemas import auth0
 
 humanize.i18n.activate("pt_BR")  # type: ignore   Set the locale for humanize to pt_BR
 
@@ -25,6 +26,9 @@ app = FastAPI(
     title="Felpsbot Backend API",
     description="API for the Felpsbot.",
     version="0.1.0",
+    swagger_ui_init_oauth={
+        "clientId": os.getenv("AUTH0_CLIENT_ID"),
+    },
 )
 
 
@@ -51,8 +55,8 @@ async def shutdown():
     await prisma.disconnect()
 
 
-@app.get("/me", dependencies=[Depends(UserHasScope("profile"))])
-async def get_me(me: User = Depends(get_current_auth0_user)) -> User:
+@app.get("/me")
+async def get_me(me: Annotated[auth0.User, Security(get_current_auth0_user, scopes=["profile"])]) -> auth0.User:
     return me
 
 
