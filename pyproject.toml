@@ -5,7 +5,7 @@ description = "FelpsBot Backend"
 authors = ["Pármenas Haniel <parmenashp@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.11.4"
 fastapi = "^0.99.1"
 httpx = "^0.24.1"
 loguru = "^0.7.0"
@@ -20,7 +20,18 @@ aio-pika = "^9.1.4"
 
 [tool.poetry.dev-dependencies]
 black = "^23.3.0"
-pytest = "^7.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+freezegun = "^1.2.2"
+pytest-asyncio = "^0.21.1"
+asgi-lifespan = "^2.1.0"
+doppler-env = "^0.3.1"
+pytest-cov = "^4.1.0"
+
+[tool.pytest.ini_options]
+pythonpath = "./src/"
+filterwarnings = "ignore::DeprecationWarning"
 
 [tool.black]
 line-length = 119
