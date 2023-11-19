@@ -1,8 +1,9 @@
 import os
 
 import iso8601
-from core.constants import CALLBACK_URL
 from fastapi import HTTPException
+
+from core.constants import CALLBACK_URL
 
 
 class Transport:

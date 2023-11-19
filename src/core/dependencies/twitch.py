@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from loguru import logger
-from core.schemas.twitch import Channel
-from core.twitch import twitch_api
 from fastapi import HTTPException, Path
 from httpx import HTTPStatusError
+from loguru import logger
+
+from core.schemas.twitch import Channel
+from core.twitch import twitch_api
 
 
 async def get_channel(

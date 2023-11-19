@@ -4,8 +4,8 @@ from httpx import HTTPStatusError
 from loguru import logger
 
 from core import schemas
-from core.dependencies.signature import verify_twitch_signature
 from core.dependencies.auth import authenticate_user
+from core.dependencies.signature import verify_twitch_signature
 from core.eventsub import eventsub
 from core.models.eventsub import SubscriptionRequest
 

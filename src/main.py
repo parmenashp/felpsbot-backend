@@ -7,15 +7,14 @@ import humanize
 from fastapi import Depends, FastAPI, Request, Security
 from loguru import logger
 
-from core.prisma import prisma
-from core.redis import redis
-from core.twitch import twitch_api
-from core.eventsub import eventsub
 import routes.eventsub
 import routes.gametime
-
 from core.dependencies.auth import get_current_auth0_user
+from core.eventsub import eventsub
+from core.prisma import prisma
+from core.redis import redis
 from core.schemas import auth0
+from core.twitch import twitch_api
 
 humanize.i18n.activate("pt_BR")  # type: ignore   Set the locale for humanize to pt_BR
 

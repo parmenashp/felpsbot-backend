@@ -3,7 +3,6 @@ from typing import Optional
 
 import orjson
 from loguru import logger
-
 from redis import asyncio as aioredis
 
 
@@ -124,4 +123,4 @@ class Redis:
             return [orjson.loads(v) if v is not None else None for v in redis_list], missing_keys
 
 
-redis = Redis(os.getenv("REDIS_URL"))
+redis = Redis(os.getenv("REDIS_URL", "redis://localhost:6379"))
