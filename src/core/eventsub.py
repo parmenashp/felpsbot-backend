@@ -1,24 +1,24 @@
+import os
 from collections import deque
 from datetime import datetime
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
+import aio_pika
+import orjson
+from aio_pika.abc import AbstractChannel
 from fastapi import HTTPException, Request, status
 from fastapi.responses import PlainTextResponse
 from loguru import logger
+
 from core.constants import RABBIMQ_EXCHANGE, RABBIMQ_URL
-
-from core.prisma import prisma
 from core.models.eventsub import Notification, Subscription, SubscriptionRequest
+from core.prisma import prisma
 from core.twitch import TWITCH_API_BASE_URL, TwitchAPI, twitch_api
-import aio_pika
-import os
-import orjson
-
-from aio_pika.abc import AbstractChannel
 
 if TYPE_CHECKING:
     from core.twitch import TwitchAPI
+
 from aio_pika.abc import AbstractChannel, AbstractExchange
 
 MAX_LEN_DEQUE = 15
@@ -99,7 +99,7 @@ class EventSub:
         logger.info(f"Publishing notification to rabbitmq")
         body = orjson.dumps(notification.to_publish_dict())
         await self.rabbit_exchange.publish(
-            aio_pika.Message(body=body),
+            aio_pika.Message(body=body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT),
             routing_key="",  # RabbitMQ ignores the routing key for fanout exchanges, but it is required
         )
 
