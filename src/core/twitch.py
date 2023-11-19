@@ -1,15 +1,60 @@
+import asyncio
 import os
 from datetime import datetime, timedelta
+from functools import wraps
 from urllib.parse import urljoin
 
 import httpx
-import asyncio
+from loguru import logger
+
 from core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
 from core.redis import Redis, redis
 from core.schemas.twitch import Channel
-from loguru import logger
 
 CACHE_CHANNEL_TTL = 60 * 5  # 5 minutes
+
+cache_tasks = set()
+
+
+def cache(name: str, return_type, params: list[str] | None = None, ttl: int = CACHE_CHANNEL_TTL):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            if not callable(return_type):
+                raise TypeError("Return type must have a callable constructor")
+            key_params = [kwargs.get(param) for param in params if kwargs.get(param) is not None] if params else []
+            if len(key_params) > 1:
+                raise ValueError("Only one parameter can be used as a key")
+            key = f"twitch:{name}:{key_params[0]}" if key_params else f"twitch:{name}"
+
+            logger.debug(f"Checking cache for key {key}")
+            cached = await redis.get_json(key)
+            if cached:
+                try:
+                    return return_type(**cached)
+                except TypeError:
+                    logger.exception(f"Invalid cache data for key {key!r} with value {cached!r}")
+                    raise
+
+            logger.debug(f"{name} not found in cache. Fetching from API")
+            result = await func(*args, **kwargs)
+            if not isinstance(result, return_type) and result is not None:
+                raise TypeError(f"Return type of {func.__name__} must be {return_type}")
+
+            if hasattr(result, "dict") and callable(result.dict):
+                coro = redis.set_json(key, result.dict(), ttl=ttl)
+            else:
+                coro = redis.set_json(key, result, ttl=ttl)
+
+            task = asyncio.create_task(coro)
+            cache_tasks.add(task)
+            task.add_done_callback(lambda t: cache_tasks.remove(t))
+
+            return result
+
+        return wrapper
+
+    return decorator
 
 
 class TwitchAPI:
@@ -64,6 +109,12 @@ class TwitchAPI:
             await self._redis.set("twitch:access_token", self._access_token, ttl=response["expires_in"])
             logger.info(f"New Twitch access token generated")
         elif "message" in response:
+            logger.error(f"Twitch access token request failed. {response}")
+            logger.debug(
+                f"Access token request to {TWITCH_OAUTH_URL} failed. "
+                f"Status code: {r.status_code}, Headers: {r.headers}, Body: {response}"
+            )
+        else:
             logger.error(f"Twitch access token request failed. {response}")
             logger.debug(
                 f"Access token request to {TWITCH_OAUTH_URL} failed. "
@@ -158,6 +209,7 @@ class TwitchAPI:
             logger.debug(
                 f"Delete request to {url} with params {params} took {response.elapsed}.\n"
                 f"Headers: {response.headers}\n"
+                f"Body: {response.json()}"
             )
         except httpx.RequestError as e:
             logger.exception(f"Request to {url} with params {params} failed")
@@ -166,37 +218,15 @@ class TwitchAPI:
         response.raise_for_status()
         return response
 
-    async def fetch_channels(self, broadcaster_ids: list[int]) -> list[Channel]:
+    @cache("channel", Channel, params=["broadcaster_id"])
+    async def get_channel(self, broadcaster_id: int) -> Channel | None:
         """Fetches channel information for a list of users."""
 
-        logger.debug(f"Fetching {len(broadcaster_ids)} streams from API. {broadcaster_ids}")
-        response = await self.get("channels", params={"broadcaster_id": broadcaster_ids})
-        return [Channel(**x) for x in response.json()["data"]]
-
-    async def get_channel(self, broadcaster_id: int) -> Channel | None:
-        """Gets channel information for a user from cache or API if not cached."""
-
-        logger.debug(f"Getting channel {broadcaster_id}")
-        channel = await self._redis.get_json(f"twitch:channel:{broadcaster_id}")
-        if channel:
-            logger.debug(f"Channel {broadcaster_id} found in cache")
-            return Channel(**channel)
-
-        logger.debug(f"Channel {broadcaster_id} not found in cache. Fetching from API")
-        channel = await self.fetch_channels([broadcaster_id])
-        if not channel:
-            logger.debug(f"Channel {broadcaster_id} not found in API")
-            return None
-
-        asyncio.create_task(
-            self._redis.set_json(
-                f"twitch:channel:{broadcaster_id}",
-                channel[0].dict(),
-                ttl=CACHE_CHANNEL_TTL,
-            )
-        )
-
-        return channel[0]
+        logger.debug(f"Fetching channel {broadcaster_id}  from API")
+        response = await self.get("channels", params={"broadcaster_id": broadcaster_id})
+        if channels := [Channel(**x) for x in response.json()["data"]]:
+            return channels[0]
+        return None
 
 
 twitch_api = TwitchAPI(os.environ["TWITCH_CLIENT_ID"], os.environ["TWITCH_CLIENT_SECRET"], redis)
