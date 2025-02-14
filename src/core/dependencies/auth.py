@@ -18,14 +18,14 @@ from starlette.status import (
     HTTP_503_SERVICE_UNAVAILABLE,
 )
 
-from core.constants import AUTH0_AUDIENCE, AUTH0_ISSUER
 from core.schemas import auth0
+from core.settings import settings
 
 
 class DiscordOAuth2ImplicitBearer(OAuth2):
     def __init__(self):
-        url_encoded_audience = urllib.parse.urlencode({"audience": AUTH0_AUDIENCE})
-        authorization_url = f"{AUTH0_ISSUER}authorize?{url_encoded_audience}&connection=discord"
+        url_encoded_audience = urllib.parse.urlencode({"audience": settings.auth0_audience})
+        authorization_url = f"{settings.auth0_issuer}authorize?{url_encoded_audience}&connection=discord"
         super().__init__(
             flows=OAuthFlows(
                 implicit=OAuthFlowImplicit(
@@ -108,7 +108,7 @@ class AuthenticatedJWTToken:
 
 
 implicit_auth_scheme = DiscordOAuth2ImplicitBearer()
-token_validator = Auth0JWTBearerTokenValidator(audience=AUTH0_AUDIENCE, issuer=AUTH0_ISSUER)
+token_validator = Auth0JWTBearerTokenValidator(audience=settings.auth0_audience, issuer=settings.auth0_issuer)
 
 
 async def authenticate_user(
@@ -144,7 +144,7 @@ async def get_current_auth0_user(token: Annotated[AuthenticatedJWTToken, Depends
 
     async with httpx.AsyncClient() as client:
         r = await client.get(
-            url=f"{AUTH0_ISSUER}userinfo",
+            url=f"{settings.auth0_issuer}userinfo",
             headers={"Authorization": f"Bearer {token.token}", "Content-Type": "application/json"},
         )
     try:

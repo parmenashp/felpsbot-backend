@@ -3,13 +3,14 @@ name = "felpsbot-backend"
 version = "0.1.0"
 description = "FelpsBot Backend"
 authors = ["Pármenas Haniel <parmenashp@gmail.com>"]
+packages = [{ include = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11.4"
 fastapi = "^0.99.1"
 httpx = "^0.24.1"
 loguru = "^0.7.0"
-redis = "^4.6.0"
+felpsbot-redis = { path = "../shared-libs/felpsbot-redis/", develop = true}
 Authlib = "^1.1.0"
 orjson = "^3.9.1"
 iso8601 = "^2.0.0"
@@ -28,6 +29,7 @@ pytest-asyncio = "^0.21.1"
 asgi-lifespan = "^2.1.0"
 doppler-env = "^0.3.1"
 pytest-cov = "^4.1.0"
+pytest-dotenv = "^0.5.2"
 
 [tool.pytest.ini_options]
 pythonpath = "./src/"

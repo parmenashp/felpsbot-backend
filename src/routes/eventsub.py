@@ -12,7 +12,7 @@ from core.models.eventsub import SubscriptionRequest
 router = APIRouter(prefix="/eventsub", tags=["Twitch EventSub"])
 
 
-# be sure to change the callback url in the core.constants file if you change the path here
+# be sure to change the callback url in the core.settings file if you change the path here
 @router.post(
     path="/callback",
     dependencies=[Depends(verify_twitch_signature)],

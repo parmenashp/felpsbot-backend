@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import os
 from datetime import datetime, timedelta
 from functools import wraps
@@ -7,9 +8,9 @@ from urllib.parse import urljoin
 import httpx
 from loguru import logger
 
-from core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
 from core.redis import Redis, redis
 from core.schemas.twitch import Channel
+from core.settings import settings
 
 CACHE_CHANNEL_TTL = 60 * 5  # 5 minutes
 
@@ -22,13 +23,19 @@ def cache(name: str, return_type, params: list[str] | None = None, ttl: int = CA
         async def wrapper(*args, **kwargs):
             if not callable(return_type):
                 raise TypeError("Return type must have a callable constructor")
-            key_params = [kwargs.get(param) for param in params if kwargs.get(param) is not None] if params else []
+
+            bound_arguments = inspect.signature(func).bind(*args, **kwargs)
+            key_params = (
+                [bound_arguments.arguments[param] for param in params if param in bound_arguments.arguments]
+                if params
+                else []
+            )
             if len(key_params) > 1:
                 raise ValueError("Only one parameter can be used as a key")
-            key = f"twitch:{name}:{key_params[0]}" if key_params else f"twitch:{name}"
 
+            key = f"twitch:{name}:{key_params[0]}" if key_params else f"twitch:{name}"
             logger.debug(f"Checking cache for key {key}")
-            cached = await redis.get_json(key)
+            cached = await redis.json.get(key)
             if cached:
                 try:
                     return return_type(**cached)
@@ -42,9 +49,9 @@ def cache(name: str, return_type, params: list[str] | None = None, ttl: int = CA
                 raise TypeError(f"Return type of {func.__name__} must be {return_type}")
 
             if hasattr(result, "dict") and callable(result.dict):
-                coro = redis.set_json(key, result.dict(), ttl=ttl)
+                coro = redis.json.set(key, ".", result.dict(), ex=ttl)
             else:
-                coro = redis.set_json(key, result, ttl=ttl)
+                coro = redis.json.set(key, ".", result, ex=ttl)
 
             task = asyncio.create_task(coro)
             cache_tasks.add(task)
@@ -67,6 +74,8 @@ class TwitchAPI:
         self._httpx_client = httpx.AsyncClient()
         self._access_token: str | None = None
         self._access_token_expires: datetime | None = None
+        self._twitch_api_base_url = settings.twitch_api_base_url
+        self._twitch_oauth_url = settings.twitch_oauth_url
 
     async def shutdown(self):
         logger.info("Shutting down HTTPX Twitch client")
@@ -82,7 +91,7 @@ class TwitchAPI:
             logger.info("Twitch API authorized")
             return
 
-        ttl = await self._redis.get_ttl("twitch:access_token")
+        ttl = await self._redis.ttl("twitch:access_token")
         if ttl:
             # -5 seconds just to be safe
             self._access_token_expires = datetime.now() + timedelta(seconds=ttl - 5)
@@ -97,7 +106,7 @@ class TwitchAPI:
                 "client_secret": self._client_secret,
                 "grant_type": "client_credentials",
             }
-            r = await self._httpx_client.post(TWITCH_OAUTH_URL, params=params)
+            r = await self._httpx_client.post(self._twitch_oauth_url, params=params)
             response: dict = r.json()
         except httpx.RequestError as e:
             logger.exception("Twitch access token request failed")
@@ -106,18 +115,18 @@ class TwitchAPI:
         if "access_token" in response:
             self._access_token = response["access_token"]
             self._access_token_expires = datetime.utcnow() + timedelta(seconds=response["expires_in"])
-            await self._redis.set("twitch:access_token", self._access_token, ttl=response["expires_in"])
+            await self._redis.set("twitch:access_token", self._access_token, ex=response["expires_in"])
             logger.info(f"New Twitch access token generated")
         elif "message" in response:
             logger.error(f"Twitch access token request failed. {response}")
             logger.debug(
-                f"Access token request to {TWITCH_OAUTH_URL} failed. "
+                f"Access token request to {self._twitch_oauth_url} failed. "
                 f"Status code: {r.status_code}, Headers: {r.headers}, Body: {response}"
             )
         else:
             logger.error(f"Twitch access token request failed. {response}")
             logger.debug(
-                f"Access token request to {TWITCH_OAUTH_URL} failed. "
+                f"Access token request to {self._twitch_oauth_url} failed. "
                 f"Status code: {r.status_code}, Headers: {r.headers}, Body: {response}"
             )
 
@@ -135,7 +144,7 @@ class TwitchAPI:
 
     async def get(self, path, params=None) -> httpx.Response:
         """Makes an authenticated GET request to the Twitch API"""
-        url = urljoin(TWITCH_API_BASE_URL, path)
+        url = urljoin(self._twitch_api_base_url, path)
         await self._ensure_token()
         headers = {
             "Client-ID": self._client_id,
@@ -162,7 +171,7 @@ class TwitchAPI:
 
     async def post(self, path: str, json: dict | str | None = None, params: dict | None = None) -> httpx.Response:
         """Makes an authenticated POST request to the Twitch API"""
-        url = urljoin(TWITCH_API_BASE_URL, path)
+        url = urljoin(self._twitch_api_base_url, path)
         await self._ensure_token()
         headers = {
             "Client-ID": self._client_id,
@@ -196,7 +205,7 @@ class TwitchAPI:
 
     async def delete(self, path: str, params: dict | None = None) -> httpx.Response:
         """Makes an authenticated DELETE request to the Twitch API"""
-        url = urljoin(TWITCH_API_BASE_URL, path)
+        url = urljoin(self._twitch_api_base_url, path)
         await self._ensure_token()
         headers = {"Client-ID": self._client_id, "Authorization": f"Bearer {self._access_token}"}
 

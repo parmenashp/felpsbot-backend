@@ -14,6 +14,7 @@ from core.eventsub import eventsub
 from core.prisma import prisma
 from core.redis import redis
 from core.schemas import auth0
+from core.settings import settings
 from core.twitch import twitch_api
 
 humanize.i18n.activate("pt_BR")  # type: ignore   Set the locale for humanize to pt_BR
@@ -26,7 +27,7 @@ app = FastAPI(
     description="API for the Felpsbot.",
     version="0.1.0",
     swagger_ui_init_oauth={
-        "clientId": os.getenv("AUTH0_CLIENT_ID"),
+        "clientId": settings.auth0_client_id,
     },
 )
 

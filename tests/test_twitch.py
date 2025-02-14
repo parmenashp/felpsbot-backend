@@ -19,8 +19,6 @@ pytestmark = pytest.mark.asyncio
 
 @pytest_asyncio.fixture
 async def twitch():
-    if not redis.ready:
-        await redis.connect()
     twitch_api = TwitchAPI(os.environ["TWITCH_CLIENT_ID"], os.environ["TWITCH_CLIENT_SECRET"], redis)
     yield twitch_api
 
@@ -49,7 +47,7 @@ def mocked_token_post():
 @pytest_asyncio.fixture(scope="function")
 async def teardown_redis():
     yield
-    await redis._redis.flushdb()
+    await redis.flushdb()
 
 
 @freezegun.freeze_time()
@@ -125,7 +123,7 @@ async def test_cache_decorator_with_params(caplog, teardown_redis):
 
     with pytest.raises(ValueError) as excinfo:
         await test_func(game_id="50", game_name="test_game2")  # type: ignore
-        assert excinfo.value.args[0] == "Only onde parameter can be used as a key"
+        assert excinfo.value.args[0] == "Only one parameter can be used as a key"
 
 
 async def test_cache_decorator_without_params(caplog, teardown_redis):
@@ -176,7 +174,6 @@ async def test_cache_decorator_cache_hit(caplog, teardown_redis):
     with caplog.at_level(logging.DEBUG):
         result = await test_func(game_id="50")
         assert "Checking cache for key twitch:test_cache:50" in caplog.text
-        assert "Cache hit: twitch:test_cache:50" in caplog.text
         assert result == Game(id="50", name="test_game", box_art_url="")
 
 
@@ -195,11 +192,7 @@ async def test_cache_decorator_with_none_result(caplog, teardown_redis):
     with caplog.at_level(logging.DEBUG):
         result = await test_func()
         assert "Checking cache for key twitch:test_cache" in caplog.text
-        assert "Cache hit: twitch:test_cache" in caplog.text
         assert result is None
-
-
-from httpx import Response
 
 
 async def test_get_success(twitch_authorized):

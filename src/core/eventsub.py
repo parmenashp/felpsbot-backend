@@ -11,10 +11,10 @@ from fastapi import HTTPException, Request, status
 from fastapi.responses import PlainTextResponse
 from loguru import logger
 
-from core.constants import RABBIMQ_EXCHANGE, RABBIMQ_URL
 from core.models.eventsub import Notification, Subscription, SubscriptionRequest
 from core.prisma import prisma
-from core.twitch import TWITCH_API_BASE_URL, TwitchAPI, twitch_api
+from core.settings import settings
+from core.twitch import TwitchAPI, twitch_api
 
 if TYPE_CHECKING:
     from core.twitch import TwitchAPI
@@ -33,13 +33,17 @@ class EventSub:
         self.subscriptions = []
         self.rabbit_channel: AbstractChannel
         self.rabbit_exchange: AbstractExchange
+        self._rabbitmq_exchange_name = settings.rabbitmq_exchange_name
+        self._rabbitmq_queue_name = settings.rabbitmq_queue_name
+        self._twitch_api_base_url = settings.twitch_api_base_url
+        self._rabbitmq_url = settings.rabbitmq_url
 
     async def connect_to_rabbitmq(self):
         logger.info("Connecting to rabbitmq")
-        connection = await aio_pika.connect_robust(RABBIMQ_URL)
+        connection = await aio_pika.connect_robust(self._rabbitmq_url)
         self.rabbit_channel = await connection.channel()
         self.rabbit_exchange = await self.rabbit_channel.declare_exchange(
-            RABBIMQ_EXCHANGE, aio_pika.ExchangeType.FANOUT, durable=True
+            self._rabbitmq_exchange_name, aio_pika.ExchangeType.FANOUT, durable=True
         )
 
     async def callback_handler(self, request: Request):
@@ -157,7 +161,7 @@ class EventSub:
     async def fetch_subscriptions(self):
         logger.info("Fetching eventsub subscriptions")
 
-        response = await self.twitch_api.get(TWITCH_API_BASE_URL + "eventsub/subscriptions")
+        response = await self.twitch_api.get(self._twitch_api_base_url + "eventsub/subscriptions")
         self.subscriptions = [Subscription(data=sub) for sub in response.json()["data"]]
         logger.info(f"Fetched {len(self.subscriptions)} subscriptions")
 
@@ -182,7 +186,7 @@ class EventSub:
                     return False
 
         response = await self.twitch_api.post(
-            TWITCH_API_BASE_URL + "eventsub/subscriptions", json=sub_request.to_dict()
+            self._twitch_api_base_url + "eventsub/subscriptions", json=sub_request.to_dict()
         )
 
         # TODO: remover os esses debugs e colocar eles no post get delete do twitch_api
@@ -200,7 +204,9 @@ class EventSub:
 
         logger.info(f"Unsubscribing from {subscription.type} with condition {subscription.condition}")
 
-        response = await self.twitch_api.delete(TWITCH_API_BASE_URL + f"eventsub/subscriptions?id={subscription.id}")
+        response = await self.twitch_api.delete(
+            self._twitch_api_base_url + f"eventsub/subscriptions?id={subscription.id}"
+        )
         if response.status_code == status.HTTP_204_NO_CONTENT:
             logger.info(f"Unsubscription from {subscription.type} with condition {subscription.condition} accepted")
             return True
