@@ -19,7 +19,7 @@ RUN pip install poetry
 COPY poetry.lock pyproject.toml ./
 
 RUN poetry config virtualenvs.create false \
-    && poetry install --without dev --no-interaction
+    && poetry install --only main --no-interaction
 
 COPY ./prisma ./prisma
 
