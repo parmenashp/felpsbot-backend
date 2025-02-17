@@ -6,16 +6,16 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 from loguru import logger
 
-from core.dependencies.twitch import get_channel
+from core.dependencies.twitch import get_stream
 from core.prisma import prisma
-from core.schemas.twitch import Channel
+from core.schemas.twitch import Stream
 
 router = APIRouter(tags=["Twitch Commands"])
 
 
 @router.get("/streamgametime/{streamer_id}", summary="Time since the streamer started playing the current game.")
 async def get_stream_game_time(
-    channel: Annotated[Channel, Depends(get_channel)], fallback: str = "desconhecido"
+    stream: Annotated[Stream | None, Depends(get_stream)], fallback: str = "desconhecido"
 ) -> PlainTextResponse:
     """
     Returns the time since the streamer started playing the current game in a human readable format.
@@ -23,13 +23,12 @@ async def get_stream_game_time(
     Only works for the Felps channel (ID: 30672329) for now.
     """
 
-    # If streamer is offline, game_id = ""
-    if not channel.game_id:
+    if not stream:
         logger.info("Streamer is offline, returning fallback")
         return PlainTextResponse(fallback)
 
     last_time = await prisma.lasttimeplayed.find_unique(
-        where={"game_streamer_unique": {"game_id": int(channel.game_id), "streamer_id": int(channel.broadcaster_id)}}
+        where={"game_streamer_unique": {"game_id": int(stream.game_id), "streamer_id": int(stream.broadcaster_id)}}
     )
 
     if last_time is None:
@@ -39,5 +38,5 @@ async def get_stream_game_time(
     time_playing_delta = datetime.now(timezone.utc) - last_time.last_time
     text = humanize.precisedelta(time_playing_delta, minimum_unit="seconds", format="%0.0f")
 
-    logger.info(f"Streamer is playing {channel.game_name} for {text}")
+    logger.info(f"Streamer is playing {stream.game_name} for {text}")
     return PlainTextResponse(text)

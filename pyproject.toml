@@ -19,10 +19,8 @@ humanize = "^4.7.0"
 prisma = "^0.9.1"
 aio-pika = "^9.1.4"
 
-[tool.poetry.dev-dependencies]
-black = "^23.3.0"
-
 [tool.poetry.group.dev.dependencies]
+black = "^23.3.0"
 pytest = "^7.4.3"
 freezegun = "^1.2.2"
 pytest-asyncio = "^0.21.1"
@@ -38,5 +36,5 @@ filterwarnings = "ignore::DeprecationWarning"
 line-length = 119
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"

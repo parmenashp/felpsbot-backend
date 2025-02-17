@@ -9,13 +9,14 @@ from loguru import logger
 
 from core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
 from core.redis import Redis, redis
-from core.schemas.twitch import Channel
+from core.schemas.twitch import Channel, Stream
 
 CACHE_CHANNEL_TTL = 60 * 5  # 5 minutes
 
 cache_tasks = set()
 
 
+# FIXME: NOT WORKING
 def cache(name: str, return_type, params: list[str] | None = None, ttl: int = CACHE_CHANNEL_TTL):
     def decorator(func):
         @wraps(func)
@@ -38,13 +39,13 @@ def cache(name: str, return_type, params: list[str] | None = None, ttl: int = CA
 
             logger.debug(f"{name} not found in cache. Fetching from API")
             result = await func(*args, **kwargs)
-            if not isinstance(result, return_type) and result is not None:
+            if not isinstance(result, return_type) and result is not None:  # type: ignore
                 raise TypeError(f"Return type of {func.__name__} must be {return_type}")
 
             if hasattr(result, "dict") and callable(result.dict):
-                coro = redis.set_json(key, result.dict(), ttl=ttl)
+                coro = redis.set_json(key, result.dict(), ttl=ttl)  # type: ignore
             else:
-                coro = redis.set_json(key, result, ttl=ttl)
+                coro = redis.set_json(key, result, ttl=ttl)  # type: ignore
 
             task = asyncio.create_task(coro)
             cache_tasks.add(task)
@@ -104,7 +105,7 @@ class TwitchAPI:
             raise e
 
         if "access_token" in response:
-            self._access_token = response["access_token"]
+            self._access_token = str(response["access_token"])
             self._access_token_expires = datetime.utcnow() + timedelta(seconds=response["expires_in"])
             await self._redis.set("twitch:access_token", self._access_token, ttl=response["expires_in"])
             logger.info(f"New Twitch access token generated")
@@ -218,14 +219,22 @@ class TwitchAPI:
         response.raise_for_status()
         return response
 
-    @cache("channel", Channel, params=["broadcaster_id"])
     async def get_channel(self, broadcaster_id: int) -> Channel | None:
-        """Fetches channel information for a list of users."""
+        """Fetches channel information for a user."""
 
-        logger.debug(f"Fetching channel {broadcaster_id}  from API")
+        logger.debug(f"Fetching channel {broadcaster_id} from API")
         response = await self.get("channels", params={"broadcaster_id": broadcaster_id})
         if channels := [Channel(**x) for x in response.json()["data"]]:
             return channels[0]
+        return None
+
+    async def get_streams(self, user_id: int) -> Stream | None:
+        """Fetches stream information of a user."""
+
+        logger.debug(f"Fetching stream of user {user_id} from API")
+        response = await self.get("streams", params={"user_id": user_id})
+        if streams := [Stream(**x) for x in response.json()["data"]]:
+            return streams[0]
         return None
 
 
