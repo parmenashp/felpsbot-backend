@@ -28,7 +28,7 @@ async def get_stream_game_time(
         return PlainTextResponse(fallback)
 
     last_time = await prisma.lasttimeplayed.find_unique(
-        where={"game_streamer_unique": {"game_id": int(stream.game_id), "streamer_id": int(stream.broadcaster_id)}}
+        where={"game_streamer_unique": {"game_id": int(stream.game_id), "streamer_id": int(stream.user_id)}}
     )
 
     if last_time is None:
