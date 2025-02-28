@@ -43,7 +43,7 @@ async def get_channel(
 async def get_stream(
     streamer_id: Annotated[int, Path(description="The ID of the streamer", ge=1, le=2147483647)]
     # the streamer_id has the max value of int32
-) -> Stream | None:
+) -> Stream:
     """
     Get the Twitch streams information for the given streamer ID.
 
@@ -57,7 +57,11 @@ async def get_stream(
         HTTPException: If the streamer is not found or if there is an error with the Twitch API.
     """
     try:
-        return await twitch_api.get_streams(streamer_id)
+        streams = await twitch_api.get_stream(streamer_id)
+        if not streams:
+            logger.info(f"No streams found for streamer {streamer_id}")
+            raise HTTPException(status_code=404, detail="No streams found")
+        return streams
 
     except HTTPStatusError as e:
         logger.exception("Twitch API error")
