@@ -47,17 +47,14 @@ async def get_stream(
     """
     Get the Twitch streams information for the given streamer ID.
 
-    Args:
-        streamer_id (int): The ID of the streamer.
-
     Returns:
-        list[Stream]: A list of Twitch streams for the given streamer ID.
+        The stream information or None if the streamer is offline.
 
     Raises:
         HTTPException: If the streamer is not found or if there is an error with the Twitch API.
     """
     try:
-        return await twitch_api.get_streams(streamer_id)
+        return await twitch_api.get_stream(streamer_id)
 
     except HTTPStatusError as e:
         logger.exception("Twitch API error")

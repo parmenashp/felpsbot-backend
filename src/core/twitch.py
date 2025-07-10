@@ -228,7 +228,7 @@ class TwitchAPI:
             return channels[0]
         return None
 
-    async def get_streams(self, user_id: int) -> Stream | None:
+    async def get_stream(self, user_id: int) -> Stream | None:
         """Fetches stream information of a user."""
 
         logger.debug(f"Fetching stream of user {user_id} from API")

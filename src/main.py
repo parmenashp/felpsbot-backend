@@ -8,7 +8,8 @@ from fastapi import Depends, FastAPI, Request, Security
 from loguru import logger
 
 import routes.eventsub
-import routes.gametime
+from routes.v1 import gametime as gametime_v1
+from routes.v2 import gametime as gametime_v2
 from core.dependencies.auth import get_current_auth0_user
 from core.eventsub import eventsub
 from core.prisma import prisma
@@ -59,5 +60,6 @@ async def get_me(me: Annotated[auth0.User, Security(get_current_auth0_user, scop
     return me
 
 
-app.include_router(routes.gametime.router)
 app.include_router(routes.eventsub.router)
+app.include_router(gametime_v1.router, prefix="/v1")
+app.include_router(gametime_v2.router, prefix="/v2")
