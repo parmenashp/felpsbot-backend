@@ -36,6 +36,8 @@ class DiscordOAuth2ImplicitBearer(OAuth2):
                         "eventsub:list": "List EventSub subscriptions",
                         "eventsub:create": "Create EventSub subscriptions",
                         "eventsub:delete": "Delete EventSub subscriptions",
+                        "subscriptions:read": "Read user game subscriptions",
+                        "subscriptions:write": "Manage user game subscriptions",
                     },
                 )
             ),

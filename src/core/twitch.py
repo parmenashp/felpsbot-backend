@@ -9,7 +9,7 @@ from loguru import logger
 
 from core.constants import TWITCH_API_BASE_URL, TWITCH_OAUTH_URL
 from core.redis import Redis, redis
-from core.schemas.twitch import Channel, Stream
+from core.schemas.twitch import Channel, Stream, Game
 
 CACHE_CHANNEL_TTL = 60 * 5  # 5 minutes
 
@@ -237,5 +237,30 @@ class TwitchAPI:
             return streams[0]
         return None
 
+    async def get_games(self, game_ids: list[str] | None = None, game_names: list[str] | None = None) -> list[Game]:
+        """Fetches games by id or name."""
+        if game_ids is None and game_names is None:
+            raise ValueError("At least one of game_ids or game_names must be set.")
+        if game_ids is not None and game_names is not None:
+            raise ValueError("Only one of game_ids or game_names must be set.")
+        params: dict[str, list[str]]
+        if game_ids is not None:
+            if not game_ids:
+                return []
+            params = {"id": game_ids}
+        else:
+            if not game_names:
+                return []
+            params = {"name": game_names or []}
+        response = await self.get("games", params=params)
+        return [Game(**x) for x in response.json().get("data", [])]
+
+    async def search_games(self, query: str, limit: int = 25) -> list[Game]:
+        """Searches games (categories) by query."""
+        query = (query or "").strip()
+        if not query:
+            return []
+        response = await self.get("search/categories", params={"query": query, "first": limit})
+        return [Game(**x) for x in response.json().get("data", [])]
 
 twitch_api = TwitchAPI(os.environ["TWITCH_CLIENT_ID"], os.environ["TWITCH_CLIENT_SECRET"], redis)

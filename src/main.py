@@ -10,6 +10,8 @@ from loguru import logger
 import routes.eventsub
 from routes.v1 import gametime as gametime_v1
 from routes.v2 import gametime as gametime_v2
+from routes.v1 import games as games_v1
+from routes.v1 import subscriptions as subscriptions_v1
 from core.dependencies.auth import get_current_auth0_user
 from core.eventsub import eventsub
 from core.prisma import prisma
@@ -63,3 +65,5 @@ async def get_me(me: Annotated[auth0.User, Security(get_current_auth0_user, scop
 app.include_router(routes.eventsub.router)
 app.include_router(gametime_v1.router, prefix="/v1")
 app.include_router(gametime_v2.router, prefix="/v2")
+app.include_router(games_v1.router, prefix="/v1")
+app.include_router(subscriptions_v1.router, prefix="/v1")

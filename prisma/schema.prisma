@@ -8,6 +8,13 @@ generator client {
     recursive_type_depth = -1
 }
 
+model User {
+    discord_id BigInt @id
+    name       String
+
+    game_subscriptions GameSubscription[]
+}
+
 model LastTimePlayed {
     game_id     BigInt
     streamer_id BigInt
@@ -25,6 +32,7 @@ model Game {
     image_url String
 
     last_time_played LastTimePlayed[]
+    game_subscriptions GameSubscription[]
 }
 
 model Streamer {
@@ -32,4 +40,18 @@ model Streamer {
     name      String
 
     last_time_played LastTimePlayed[]
+    game_subscriptions GameSubscription[]
+}
+
+model GameSubscription {
+    user_discord_id    BigInt
+    game_twitch_id     BigInt
+    streamer_twitch_id BigInt
+    created_at         DateTime @default(now())
+
+    user     User     @relation(fields: [user_discord_id], references: [discord_id])
+    game     Game     @relation(fields: [game_twitch_id], references: [twitch_id])
+    streamer Streamer @relation(fields: [streamer_twitch_id], references: [twitch_id])
+
+    @@id([user_discord_id, game_twitch_id, streamer_twitch_id], name: "user_game_streamer_unique")
 }
