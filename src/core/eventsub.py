@@ -1,6 +1,6 @@
 import os
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
@@ -61,15 +61,15 @@ class EventSub:
         logger.info(f"Received an eventsub webhook message of type {msg_type}")
 
         if msg_type == "notification":
-            body: dict = await request.json()
-            return await self._handle_notification(Notification(data=body), request)
+            notification_payload: dict = await request.json()
+            return await self._handle_notification(Notification(data=notification_payload), request)
 
         elif msg_type == "webhook_callback_verification":
             return await self._handle_verification(request)
 
         elif msg_type == "revocation":
-            body: dict = await request.json()
-            return await self._handle_revocation(Subscription(data=body))
+            revocation_payload: dict = await request.json()
+            return await self._handle_revocation(Subscription(data=revocation_payload))
 
         else:
             raise HTTPException(
@@ -150,7 +150,7 @@ class EventSub:
             where={"game_streamer_unique": {"game_id": int(game_id), "streamer_id": int(streamer_id)}},
             data={
                 "create": {"game_id": int(game_id), "streamer_id": int(streamer_id)},
-                "update": {"last_time": datetime.utcnow()},
+                "update": {"last_time": datetime.now(timezone.utc)},
             },
         )
 

@@ -45,12 +45,24 @@ async def list_subscriptions(
         include={"game": True},
         order={"created_at": "asc"},
     )
+    # Fetch last time played for all subscribed games in a single query
+    game_ids = [int(s.game_twitch_id) for s in subscriptions]
+    last_times = {}
+    if game_ids:
+        db_last_times = await prisma.lasttimeplayed.find_many(
+            where={
+                "streamer_id": 30672329,
+                "game_id": {"in": game_ids},
+            }
+        )
+        last_times = {int(x.game_id): x.last_time.isoformat() if getattr(x, "last_time", None) else None for x in db_last_times}
     result = [
         SubscriptionItem(
             gameId=int(s.game_twitch_id),
             name=s.game.name if s.game else None,
             imageUrl=s.game.image_url if s.game else None,
             createdAt=s.created_at.isoformat() if getattr(s, "created_at", None) else None,
+            lastTimePlayed=last_times.get(int(s.game_twitch_id)),
         )
         for s in subscriptions
     ]
@@ -125,7 +137,18 @@ async def create_subscription(
         logger.debug(f"Unique violation on subscription create: {e}")
         raise HTTPException(status_code=409, detail="Subscription already exists")
 
-    return JSONResponse(SubscriptionCreated(gameId=game_id, name=game_name, imageUrl=image_url).dict(), status_code=201)
+    # Fetch last time played for this game (if any)
+    last_time_obj = await prisma.lasttimeplayed.find_unique(
+        where={
+            "game_streamer_unique": {"game_id": int(game_id), "streamer_id": 30672329},
+        }
+    )
+    last_time_iso = last_time_obj.last_time.isoformat() if last_time_obj and getattr(last_time_obj, "last_time", None) else None
+
+    return JSONResponse(
+        SubscriptionCreated(gameId=game_id, name=game_name, imageUrl=image_url, lastTimePlayed=last_time_iso).dict(),
+        status_code=201,
+    )
 
 
 @router.delete(

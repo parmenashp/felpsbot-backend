@@ -9,6 +9,7 @@ class SubscriptionItem(BaseModel):
     name: Optional[str]
     imageUrl: Optional[str]
     createdAt: Optional[str]
+    lastTimePlayed: Optional[str]
 
 
 class CreateSubscriptionRequest(BaseModel):
@@ -28,5 +29,6 @@ class SubscriptionCreated(BaseModel):
     gameId: int
     name: str
     imageUrl: str
+    lastTimePlayed: Optional[str] = None
 
 
