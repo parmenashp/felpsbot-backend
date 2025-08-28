@@ -5,6 +5,7 @@ from typing import Annotated
 
 import humanize
 from fastapi import Depends, FastAPI, Request, Security
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 import routes.eventsub
@@ -31,6 +32,19 @@ app = FastAPI(
     swagger_ui_init_oauth={
         "clientId": os.getenv("AUTH0_CLIENT_ID"),
     },
+)
+
+
+# CORS configuration
+_default_cors = "http://localhost:5173, http://127.0.0.1:5173, https://felpsbot.mitsuaky.dog"
+_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", _default_cors).split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
